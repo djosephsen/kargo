@@ -1,7 +1,7 @@
 # Kargo-CSR
 ## The Custom StepRunner Fork
 
-This is a fork of the excellent [Kargo](kargo.io) project, which tracks upstream releases while adding a single feature: A "custom" step-runner.
+This is a fork of the excellent [Kargo](https://kargo.io) project, which tracks upstream releases while adding a single feature: A "custom" step-runner.
 
 The general idea is that end-users (like you) write custom code in the language of your choice, wrap it in a GRPC server and run it in a pod adjacent to Kargo. Then:
 
