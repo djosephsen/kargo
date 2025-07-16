@@ -24,6 +24,8 @@ There is no getting started yet sorry, the custom steprunner itself is still und
 
 This repository tracks the upstream Kargo project, adding only the custom steprunner. Once the steprunner is operational, I'll publish it in a `Kargo-CSR` helm chart with identical versioning to the upstream releases.
 
+Current work is ongoing in the `dj/grpc` branch if you wanna check it out.
+
 Once I have the steprunner working and published, I'll to cut a second repository for client-tools, like an SDK or at least some bootstrapping scripts to make it easier to create custom functions of your own. I'll likely target Golang initially.
 
 ## Contributing
