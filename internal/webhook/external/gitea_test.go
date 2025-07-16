@@ -17,27 +17,23 @@ import (
 	"github.com/akuity/kargo/internal/indexer"
 )
 
-func TestBitbucketHandler(t *testing.T) {
+const giteaWebhookRequestBodyImage = `
+{
+	"repository": {
+		"clone_url": "https://gitea.com/example/repo.git"
+	}
+}`
+
+func TestGiteaHandler(t *testing.T) {
 	const testURL = "https://webhooks.kargo.example.com/nonsense"
 
 	const testProjectName = "fake-project"
-
-	const pushEventRequestBody = `
-{
-	"repository": {
-		"links": {
-			"html": {
-				"href": "https://bitbucket.org/example/repo"
-			}
-		}
-	}
-}`
 
 	testScheme := runtime.NewScheme()
 	require.NoError(t, kargoapi.AddToScheme(testScheme))
 
 	testSecretData := map[string][]byte{
-		bitbucketSecretDataKey: []byte(testSigningKey),
+		giteaSecretDataKey: []byte(testSigningKey),
 	}
 
 	testCases := []struct {
@@ -62,11 +58,11 @@ func TestBitbucketHandler(t *testing.T) {
 			secretData: testSecretData,
 			req: func() *http.Request {
 				req := httptest.NewRequest(http.MethodPost, testURL, nil)
-				req.Header.Set(bitbucketEventHeader, "nonsense")
+				req.Header.Set(giteaEventTypeHeader, "nonsense")
 				return req
 			},
 			assertions: func(t *testing.T, rr *httptest.ResponseRecorder) {
-				require.Equal(t, http.StatusBadRequest, rr.Code)
+				require.Equal(t, http.StatusNotImplemented, rr.Code)
 				require.JSONEq(
 					t,
 					`{"error":"event type nonsense is not supported"}`,
@@ -79,7 +75,7 @@ func TestBitbucketHandler(t *testing.T) {
 			secretData: testSecretData,
 			req: func() *http.Request {
 				req := httptest.NewRequest(http.MethodPost, testURL, nil)
-				req.Header.Set(bitbucketEventHeader, bitbucketPushEvent)
+				req.Header.Set(giteaEventTypeHeader, "push")
 				return req
 			},
 			assertions: func(t *testing.T, rr *httptest.ResponseRecorder) {
@@ -92,8 +88,8 @@ func TestBitbucketHandler(t *testing.T) {
 			secretData: testSecretData,
 			req: func() *http.Request {
 				req := httptest.NewRequest(http.MethodPost, testURL, nil)
-				req.Header.Set(bitbucketEventHeader, bitbucketPushEvent)
-				req.Header.Set(bitbucketSignatureHeader, "totally-invalid-signature")
+				req.Header.Set(giteaEventTypeHeader, "push")
+				req.Header.Set(giteaSignatureHeader, "totally-invalid-signature")
 				return req
 			},
 			assertions: func(t *testing.T, rr *httptest.ResponseRecorder) {
@@ -107,8 +103,8 @@ func TestBitbucketHandler(t *testing.T) {
 			req: func() *http.Request {
 				bodyBuf := bytes.NewBuffer([]byte("invalid json"))
 				req := httptest.NewRequest(http.MethodPost, testURL, bodyBuf)
-				req.Header.Set(bitbucketEventHeader, bitbucketPushEvent)
-				req.Header.Set(bitbucketSignatureHeader, sign(bodyBuf.Bytes()))
+				req.Header.Set(giteaSignatureHeader, sign(bodyBuf.Bytes()))
+				req.Header.Set(giteaEventTypeHeader, "push")
 				return req
 			},
 			assertions: func(t *testing.T, rr *httptest.ResponseRecorder) {
@@ -128,7 +124,7 @@ func TestBitbucketHandler(t *testing.T) {
 					Spec: kargoapi.WarehouseSpec{
 						Subscriptions: []kargoapi.RepoSubscription{{
 							Git: &kargoapi.GitSubscription{
-								RepoURL: "https://bitbucket.org/example/repo",
+								RepoURL: "https://gitea.com/example/repo",
 							},
 						}},
 					},
@@ -139,19 +135,19 @@ func TestBitbucketHandler(t *testing.T) {
 				indexer.WarehousesBySubscribedURLs,
 			).Build(),
 			req: func() *http.Request {
-				bodyBuf := bytes.NewBuffer([]byte(pushEventRequestBody))
-				req := httptest.NewRequest(http.MethodPost, testURL, bodyBuf)
-				req.Header.Set(bitbucketEventHeader, bitbucketPushEvent)
-				req.Header.Set(bitbucketSignatureHeader, sign(bodyBuf.Bytes()))
+				b := []byte(giteaWebhookRequestBodyImage)
+				req := httptest.NewRequest(
+					http.MethodPost,
+					testURL,
+					bytes.NewBuffer(b),
+				)
+				req.Header.Set(giteaSignatureHeader, sign(b))
+				req.Header.Set(giteaEventTypeHeader, "push")
 				return req
 			},
 			assertions: func(t *testing.T, rr *httptest.ResponseRecorder) {
 				require.Equal(t, http.StatusOK, rr.Code)
-				require.JSONEq(
-					t,
-					`{"msg":"refreshed 1 warehouse(s)"}`,
-					rr.Body.String(),
-				)
+				require.JSONEq(t, `{"msg":"refreshed 1 warehouse(s)"}`, rr.Body.String())
 			},
 		},
 	}
@@ -164,7 +160,7 @@ func TestBitbucketHandler(t *testing.T) {
 			})
 
 			w := httptest.NewRecorder()
-			(&bitbucketWebhookReceiver{
+			(&giteaWebhookReceiver{
 				baseWebhookReceiver: &baseWebhookReceiver{
 					client:     testCase.client,
 					project:    testProjectName,
